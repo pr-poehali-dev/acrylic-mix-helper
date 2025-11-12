@@ -5,6 +5,7 @@ import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
+import ColorFromImage from './ColorFromImage';
 
 interface Color {
   name: string;
@@ -72,36 +73,70 @@ export default function ColorMixer() {
     } : { r: 128, g: 128, b: 128 };
   };
 
+  const findClosestColor = (targetRgb: { r: number; g: number; b: number }) => {
+    let minDistance = Infinity;
+    let closest = BASIC_COLORS[0];
+    
+    BASIC_COLORS.forEach(color => {
+      const distance = Math.sqrt(
+        Math.pow(color.r - targetRgb.r, 2) +
+        Math.pow(color.g - targetRgb.g, 2) +
+        Math.pow(color.b - targetRgb.b, 2)
+      );
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = color;
+      }
+    });
+    
+    return closest;
+  };
+
   const suggestMix = () => {
     const target = hexToRgb(targetColor);
     const suggestions: Color[] = [];
     
     const brightness = (target.r + target.g + target.b) / 3;
+    const saturation = Math.max(target.r, target.g, target.b) - Math.min(target.r, target.g, target.b);
     
-    if (brightness > 200) {
-      suggestions.push({ name: 'Белый', r: 255, g: 255, b: 255, amount: 3 });
-    } else if (brightness < 50) {
-      suggestions.push({ name: 'Черный', r: 0, g: 0, b: 0, amount: 3 });
-    }
-    
-    if (target.r > target.g && target.r > target.b) {
-      suggestions.push({ name: 'Красный', r: 220, g: 38, b: 38, amount: 2 });
-    }
-    if (target.b > target.r && target.b > target.g) {
-      suggestions.push({ name: 'Синий', r: 37, g: 99, b: 235, amount: 2 });
-    }
-    if (target.g > target.r && target.g > target.b) {
-      suggestions.push({ name: 'Зеленый', r: 34, g: 197, b: 94, amount: 2 });
-    }
-    
-    if (target.r > 150 && target.g > 150 && target.b < 100) {
-      suggestions.push({ name: 'Желтый', r: 250, g: 204, b: 21, amount: 2 });
-    }
-    
-    if (brightness < 200 && brightness > 50) {
-      const grayAmount = 1;
-      if (!suggestions.find(s => s.name === 'Белый' || s.name === 'Черный')) {
-        suggestions.push({ name: 'Серый', r: 156, g: 163, b: 175, amount: grayAmount });
+    if (brightness > 230) {
+      suggestions.push({ name: 'Белый', r: 255, g: 255, b: 255, amount: 5 });
+      const mainColor = findClosestColor(target);
+      if (mainColor.name !== 'Белый') {
+        suggestions.push({ ...mainColor, amount: 0.5 });
+      }
+    } else if (brightness < 30) {
+      suggestions.push({ name: 'Черный', r: 0, g: 0, b: 0, amount: 5 });
+      const mainColor = findClosestColor(target);
+      if (mainColor.name !== 'Черный') {
+        suggestions.push({ ...mainColor, amount: 0.5 });
+      }
+    } else {
+      if (saturation < 30) {
+        suggestions.push({ name: 'Белый', r: 255, g: 255, b: 255, amount: 3 });
+        suggestions.push({ name: 'Черный', r: 0, g: 0, b: 0, amount: brightness < 128 ? 2 : 1 });
+      } else {
+        const colors = [
+          { val: target.r, color: { name: 'Красный', r: 220, g: 38, b: 38 } },
+          { val: target.g, color: { name: 'Зеленый', r: 34, g: 197, b: 94 } },
+          { val: target.b, color: { name: 'Синий', r: 37, g: 99, b: 235 } },
+        ].sort((a, b) => b.val - a.val);
+        
+        suggestions.push({ ...colors[0].color, amount: 3 });
+        
+        if (colors[1].val > 50) {
+          suggestions.push({ ...colors[1].color, amount: 2 });
+        }
+        
+        if (target.r > 200 && target.g > 150 && target.b < 80) {
+          suggestions.push({ name: 'Желтый', r: 250, g: 204, b: 21, amount: 2 });
+        }
+        
+        if (brightness > 180) {
+          suggestions.push({ name: 'Белый', r: 255, g: 255, b: 255, amount: 2 });
+        } else if (brightness < 100) {
+          suggestions.push({ name: 'Черный', r: 0, g: 0, b: 0, amount: 1 });
+        }
       }
     }
     
@@ -110,11 +145,17 @@ export default function ColorMixer() {
       { name: 'Серый', r: 156, g: 163, b: 175, amount: 1 }
     ]);
   };
+  
+  const handleColorFromImage = (color: string) => {
+    setTargetColor(color);
+    setTimeout(() => suggestMix(), 100);
+  };
 
   const mixedColor = calculateMixedColor();
 
   return (
     <div className="space-y-6">
+      <ColorFromImage onColorSelect={handleColorFromImage} />
       <Card className="p-6">
         <div className="space-y-4">
           <div>
